@@ -1,4 +1,4 @@
-package com.example.sos.model.dbHelper;
+package com.example.sos.ShakeServices;
 
 
 import android.hardware.Sensor;

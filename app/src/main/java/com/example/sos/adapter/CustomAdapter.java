@@ -15,7 +15,7 @@ import androidx.annotation.NonNull;
 
 import com.example.sos.R;
 import com.example.sos.model.ContactModel;
-import com.example.sos.model.dbHelper.DbHelper;
+import com.example.sos.dbHelper.DbHelper;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 

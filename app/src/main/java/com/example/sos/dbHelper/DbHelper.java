@@ -1,4 +1,4 @@
-package com.example.sos.model.dbHelper;
+package com.example.sos.dbHelper;
 
 
 import android.content.ContentValues;

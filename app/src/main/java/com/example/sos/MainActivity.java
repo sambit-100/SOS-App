@@ -1,4 +1,4 @@
-package com.example.sos.model;
+package com.example.sos;
 
 
 import android.Manifest;
@@ -26,11 +26,11 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
-import com.example.sos.R;
 import com.example.sos.ShakeServices.ReactivateService;
 import com.example.sos.ShakeServices.SensorService;
 import com.example.sos.adapter.CustomAdapter;
-import com.example.sos.model.dbHelper.DbHelper;
+import com.example.sos.model.ContactModel;
+import com.example.sos.dbHelper.DbHelper;
 
 import java.util.List;
 
@@ -52,10 +52,8 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         // check for runtime permissions
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_DENIED) {
-                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.SEND_SMS, Manifest.permission.READ_CONTACTS}, 100);
-            }
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_DENIED) {
+            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.SEND_SMS, Manifest.permission.READ_CONTACTS}, 100);
         }
 
         // this is a special permission required only by devices using
@@ -134,37 +132,91 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+//    @Override
+//    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+//        super.onActivityResult(requestCode, resultCode, data);
+//
+//        // get the contact from the PhoneBook of device
+//        switch (requestCode) {
+//            case (PICK_CONTACT):
+//                if (resultCode == Activity.RESULT_OK) {
+//
+//                    Uri contactData = data.getData();
+//                    Cursor c = managedQuery(contactData, null, null, null, null);
+//                    if (c.moveToFirst()) {
+//
+//                        String id = c.getString(c.getColumnIndexOrThrow(ContactsContract.Contacts._ID));
+//                        String hasPhone = c.getString(c.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER));
+//                        String phone = null;
+//                        try {
+//                            if (hasPhone.equalsIgnoreCase("1")) {
+//                                Cursor phones = getContentResolver().query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null, ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = " + id, null, null);
+//                                phones.moveToFirst();
+//                                phone = phones.getString(phones.getColumnIndex("data1"));
+//                            }
+//                            String name = c.getString(c.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
+//                            db.addcontact(new ContactModel(0, name, phone));
+//                            list = db.getAllContacts();
+//                            customAdapter.refresh(list);
+//                        } catch (Exception ex) {
+//                        }
+//                    }
+//                }
+//                break;
+//        }
+//    }
+
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        // get the contact from the PhoneBook of device
-        switch (requestCode) {
-            case (PICK_CONTACT):
-                if (resultCode == Activity.RESULT_OK) {
+        if (requestCode == PICK_CONTACT && resultCode == Activity.RESULT_OK && data != null) {
+            Uri contactData = data.getData();
+            if (contactData != null) {
+                Cursor c = getContentResolver().query(contactData, null, null, null, null);
+                if (c != null && c.moveToFirst()) {
 
-                    Uri contactData = data.getData();
-                    Cursor c = managedQuery(contactData, null, null, null, null);
-                    if (c.moveToFirst()) {
+                    // Check if the column exists before accessing it
+                    int idIndex = c.getColumnIndex(ContactsContract.Contacts._ID);
+                    int hasPhoneIndex = c.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER);
+                    int displayNameIndex = c.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME);
 
-                        String id = c.getString(c.getColumnIndexOrThrow(ContactsContract.Contacts._ID));
-                        String hasPhone = c.getString(c.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER));
+                    if (idIndex != -1 && hasPhoneIndex != -1 && displayNameIndex != -1) {
+                        String id = c.getString(idIndex);
+                        String hasPhone = c.getString(hasPhoneIndex);
                         String phone = null;
-                        try {
-                            if (hasPhone.equalsIgnoreCase("1")) {
-                                Cursor phones = getContentResolver().query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null, ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = " + id, null, null);
-                                phones.moveToFirst();
-                                phone = phones.getString(phones.getColumnIndex("data1"));
+
+                        if ("1".equals(hasPhone)) {
+                            Cursor phones = getContentResolver().query(
+                                    ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                                    null,
+                                    ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                                    new String[]{id},
+                                    null
+                            );
+                            if (phones != null && phones.moveToFirst()) {
+                                int phoneIndex = phones.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER);
+                                if (phoneIndex != -1) {
+                                    phone = phones.getString(phoneIndex);
+                                }
+                                phones.close();
                             }
-                            String name = c.getString(c.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
-                            db.addcontact(new ContactModel(0, name, phone));
-                            list = db.getAllContacts();
-                            customAdapter.refresh(list);
-                        } catch (Exception ex) {
                         }
+
+                        String name = c.getString(displayNameIndex);
+                        db.addcontact(new ContactModel(0, name, phone));
+                        list = db.getAllContacts();
+                        customAdapter.refresh(list);
+                    } else {
+                        Toast.makeText(this, "Unable to find required contact details", Toast.LENGTH_SHORT).show();
                     }
+
+                    c.close();
+                } else {
+                    Toast.makeText(this, "No contact found", Toast.LENGTH_SHORT).show();
                 }
-                break;
+            }
         }
     }
 
@@ -172,11 +224,9 @@ public class MainActivity extends AppCompatActivity {
     // battery optimisation constraints from the App
     private void askIgnoreOptimization() {
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            @SuppressLint("BatteryLife") Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-            intent.setData(Uri.parse("package:" + getPackageName()));
-            startActivityForResult(intent, IGNORE_BATTERY_OPTIMIZATION_REQUEST);
-        }
+        @SuppressLint("BatteryLife") Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+        intent.setData(Uri.parse("package:" + getPackageName()));
+        startActivityForResult(intent, IGNORE_BATTERY_OPTIMIZATION_REQUEST);
 
     }
 
